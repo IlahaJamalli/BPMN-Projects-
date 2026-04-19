@@ -1,0 +1,279 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:omgdc="http://www.omg.org/spec/DD/20100524/DC" xmlns:omgdi="http://www.omg.org/spec/DD/20100524/DI" targetNamespace="http://www.example.org/CourseRegistration" exporter="Camunda Modeler" exporterVersion="5.44.0">
+  <process id="CourseRegistrationProcess" name="Course Registration Process" isExecutable="true">
+    <startEvent id="StartEvent_1" name="Student Logs In">
+      <outgoing>Flow_1</outgoing>
+    </startEvent>
+    <userTask id="Task_ViewCourses" name="View Available Courses for Upcoming Semester" camunda:assignee="${studentId}">
+      <documentation>AC1: Student sees available courses for the upcoming semester.</documentation>
+      <incoming>Flow_1</incoming>
+      <outgoing>Flow_2</outgoing>
+    </userTask>
+    <userTask id="Task_SelectCourse" name="Select Course and Click Add" camunda:assignee="${studentId}">
+      <documentation>AC2: Student selects a course and clicks Add.</documentation>
+      <incoming>Flow_2</incoming>
+      <outgoing>Flow_3</outgoing>
+    </userTask>
+    <serviceTask id="Task_CheckConflicts" name="Check Prerequisites &#38; Time Conflicts">
+      <documentation>AC2: System checks for time conflicts and prerequisites.</documentation>
+      <incoming>Flow_3</incoming>
+      <outgoing>Flow_4</outgoing>
+    </serviceTask>
+    <exclusiveGateway id="Gateway_ConflictCheck" name="Conflict or Missing Prerequisite?">
+      <incoming>Flow_4</incoming>
+      <outgoing>Flow_ConflictYes</outgoing>
+      <outgoing>Flow_ConflictNo</outgoing>
+    </exclusiveGateway>
+    <userTask id="Task_ShowConflictError" name="Show Conflict Error Message" camunda:assignee="${studentId}">
+      <documentation>AC3: An error message is shown when a conflict exists.</documentation>
+      <incoming>Flow_ConflictYes</incoming>
+      <outgoing>Flow_BackToSelect</outgoing>
+    </userTask>
+    <serviceTask id="Task_CheckCapacity" name="Check Course Capacity">
+      <documentation>AC5: System checks if course is full.</documentation>
+      <incoming>Flow_ConflictNo</incoming>
+      <outgoing>Flow_5</outgoing>
+    </serviceTask>
+    <exclusiveGateway id="Gateway_CapacityCheck" name="Course Full?">
+      <incoming>Flow_5</incoming>
+      <outgoing>Flow_CourseFull</outgoing>
+      <outgoing>Flow_CourseAvailable</outgoing>
+    </exclusiveGateway>
+    <userTask id="Task_OfferWaitlist" name="Offer Waitlist Option" camunda:assignee="${studentId}">
+      <documentation>AC5: If the course is full, a waitlist option is offered to the student.</documentation>
+      <incoming>Flow_CourseFull</incoming>
+      <outgoing>Flow_WaitlistDecision</outgoing>
+    </userTask>
+    <exclusiveGateway id="Gateway_WaitlistDecision" name="Student Joins Waitlist?">
+      <incoming>Flow_WaitlistDecision</incoming>
+      <outgoing>Flow_JoinWaitlist</outgoing>
+      <outgoing>Flow_CancelRegistration</outgoing>
+    </exclusiveGateway>
+    <serviceTask id="Task_AddToWaitlist" name="Add Student to Waitlist">
+      <incoming>Flow_JoinWaitlist</incoming>
+      <outgoing>Flow_WaitlistEnd</outgoing>
+    </serviceTask>
+    <userTask id="Task_ConfirmRegistration" name="Student Confirms Registration" camunda:assignee="${studentId}">
+      <documentation>AC4: Student confirms course registration.</documentation>
+      <incoming>Flow_CourseAvailable</incoming>
+      <outgoing>Flow_6</outgoing>
+    </userTask>
+    <serviceTask id="Task_AddCourse" name="Add Course to Student Schedule">
+      <documentation>AC4: The course is added to the student's schedule.</documentation>
+      <incoming>Flow_6</incoming>
+      <outgoing>Flow_7</outgoing>
+    </serviceTask>
+    <sendTask id="Task_SendEmail" name="Send Confirmation Email to Student">
+      <documentation>AC4: A confirmation email is sent to the student.</documentation>
+      <incoming>Flow_7</incoming>
+      <outgoing>Flow_8</outgoing>
+    </sendTask>
+    <endEvent id="EndEvent_Success" name="Registration Successful">
+      <incoming>Flow_8</incoming>
+    </endEvent>
+    <endEvent id="EndEvent_Waitlist" name="Added to Waitlist">
+      <incoming>Flow_WaitlistEnd</incoming>
+    </endEvent>
+    <endEvent id="EndEvent_Cancelled" name="Registration Cancelled">
+      <incoming>Flow_CancelRegistration</incoming>
+    </endEvent>
+    <sequenceFlow id="Flow_1" sourceRef="StartEvent_1" targetRef="Task_ViewCourses" />
+    <sequenceFlow id="Flow_2" sourceRef="Task_ViewCourses" targetRef="Task_SelectCourse" />
+    <sequenceFlow id="Flow_3" sourceRef="Task_SelectCourse" targetRef="Task_CheckConflicts" />
+    <sequenceFlow id="Flow_4" sourceRef="Task_CheckConflicts" targetRef="Gateway_ConflictCheck" />
+    <sequenceFlow id="Flow_ConflictYes" name="Yes – Conflict Found" sourceRef="Gateway_ConflictCheck" targetRef="Task_ShowConflictError">
+      <conditionExpression xsi:type="tFormalExpression">${conflictExists == true}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="Flow_ConflictNo" name="No Conflict" sourceRef="Gateway_ConflictCheck" targetRef="Task_CheckCapacity">
+      <conditionExpression xsi:type="tFormalExpression">${conflictExists == false}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="Flow_BackToSelect" name="Try Another Course" sourceRef="Task_ShowConflictError" targetRef="Task_SelectCourse" />
+    <sequenceFlow id="Flow_5" sourceRef="Task_CheckCapacity" targetRef="Gateway_CapacityCheck" />
+    <sequenceFlow id="Flow_CourseFull" name="Yes – Course Full" sourceRef="Gateway_CapacityCheck" targetRef="Task_OfferWaitlist">
+      <conditionExpression xsi:type="tFormalExpression">${courseFull == true}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="Flow_CourseAvailable" name="No – Seat Available" sourceRef="Gateway_CapacityCheck" targetRef="Task_ConfirmRegistration">
+      <conditionExpression xsi:type="tFormalExpression">${courseFull == false}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="Flow_WaitlistDecision" sourceRef="Task_OfferWaitlist" targetRef="Gateway_WaitlistDecision" />
+    <sequenceFlow id="Flow_JoinWaitlist" name="Yes – Join Waitlist" sourceRef="Gateway_WaitlistDecision" targetRef="Task_AddToWaitlist">
+      <conditionExpression xsi:type="tFormalExpression">${joinWaitlist == true}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="Flow_CancelRegistration" name="No – Cancel" sourceRef="Gateway_WaitlistDecision" targetRef="EndEvent_Cancelled">
+      <conditionExpression xsi:type="tFormalExpression">${joinWaitlist == false}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="Flow_WaitlistEnd" sourceRef="Task_AddToWaitlist" targetRef="EndEvent_Waitlist" />
+    <sequenceFlow id="Flow_6" sourceRef="Task_ConfirmRegistration" targetRef="Task_AddCourse" />
+    <sequenceFlow id="Flow_7" sourceRef="Task_AddCourse" targetRef="Task_SendEmail" />
+    <sequenceFlow id="Flow_8" sourceRef="Task_SendEmail" targetRef="EndEvent_Success" />
+  </process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="CourseRegistrationProcess">
+      <bpmndi:BPMNShape id="StartEvent_1_di" bpmnElement="StartEvent_1">
+        <omgdc:Bounds x="152" y="342" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="131" y="385" width="78" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ViewCourses_di" bpmnElement="Task_ViewCourses">
+        <omgdc:Bounds x="240" y="320" width="140" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SelectCourse_di" bpmnElement="Task_SelectCourse">
+        <omgdc:Bounds x="440" y="320" width="140" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_CheckConflicts_di" bpmnElement="Task_CheckConflicts">
+        <omgdc:Bounds x="640" y="320" width="140" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_ConflictCheck_di" bpmnElement="Gateway_ConflictCheck" isMarkerVisible="true">
+        <omgdc:Bounds x="845" y="335" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="838" y="392" width="65" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ShowConflictError_di" bpmnElement="Task_ShowConflictError">
+        <omgdc:Bounds x="820" y="200" width="140" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_CapacityCheck_di" bpmnElement="Gateway_CapacityCheck" isMarkerVisible="true">
+        <omgdc:Bounds x="1165" y="335" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="1159" y="392" width="63" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_OfferWaitlist_di" bpmnElement="Task_OfferWaitlist">
+        <omgdc:Bounds x="1140" y="200" width="140" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_WaitlistDecision_di" bpmnElement="Gateway_WaitlistDecision" isMarkerVisible="true">
+        <omgdc:Bounds x="1345" y="215" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="1336" y="272" width="68" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_AddCourse_di" bpmnElement="Task_AddCourse">
+        <omgdc:Bounds x="1480" y="320" width="140" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SendEmail_di" bpmnElement="Task_SendEmail">
+        <omgdc:Bounds x="1680" y="320" width="140" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_Success_di" bpmnElement="EndEvent_Success">
+        <omgdc:Bounds x="1882" y="342" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="1871" y="385" width="59" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_AddToWaitlist_di" bpmnElement="Task_AddToWaitlist">
+        <omgdc:Bounds x="1520" y="200" width="140" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_Waitlist_di" bpmnElement="EndEvent_Waitlist">
+        <omgdc:Bounds x="1702" y="222" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="1679" y="265" width="82" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_CheckCapacity_di" bpmnElement="Task_CheckCapacity">
+        <omgdc:Bounds x="980" y="320" width="140" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ConfirmRegistration_di" bpmnElement="Task_ConfirmRegistration">
+        <omgdc:Bounds x="1300" y="320" width="140" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_Cancelled_di" bpmnElement="EndEvent_Cancelled">
+        <omgdc:Bounds x="1482" y="82" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="1470" y="125" width="59" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_1_di" bpmnElement="Flow_1">
+        <omgdi:waypoint x="188" y="360" />
+        <omgdi:waypoint x="240" y="360" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_2_di" bpmnElement="Flow_2">
+        <omgdi:waypoint x="380" y="360" />
+        <omgdi:waypoint x="440" y="360" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_BackToSelect_di" bpmnElement="Flow_BackToSelect">
+        <omgdi:waypoint x="820" y="240" />
+        <omgdi:waypoint x="510" y="240" />
+        <omgdi:waypoint x="510" y="320" />
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="641" y="211" width="58" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_3_di" bpmnElement="Flow_3">
+        <omgdi:waypoint x="580" y="360" />
+        <omgdi:waypoint x="640" y="360" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_4_di" bpmnElement="Flow_4">
+        <omgdi:waypoint x="780" y="360" />
+        <omgdi:waypoint x="845" y="360" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ConflictYes_di" bpmnElement="Flow_ConflictYes">
+        <omgdi:waypoint x="870" y="335" />
+        <omgdi:waypoint x="870" y="280" />
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="876" y="300" width="67" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ConflictNo_di" bpmnElement="Flow_ConflictNo">
+        <omgdi:waypoint x="895" y="360" />
+        <omgdi:waypoint x="980" y="360" />
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="914" y="338" width="55" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_5_di" bpmnElement="Flow_5">
+        <omgdi:waypoint x="1120" y="360" />
+        <omgdi:waypoint x="1165" y="360" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_CourseFull_di" bpmnElement="Flow_CourseFull">
+        <omgdi:waypoint x="1190" y="335" />
+        <omgdi:waypoint x="1190" y="280" />
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="1200" y="300" width="86" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_CourseAvailable_di" bpmnElement="Flow_CourseAvailable">
+        <omgdi:waypoint x="1215" y="360" />
+        <omgdi:waypoint x="1300" y="360" />
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="1227" y="331" width="50" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_WaitlistDecision_di" bpmnElement="Flow_WaitlistDecision">
+        <omgdi:waypoint x="1280" y="240" />
+        <omgdi:waypoint x="1345" y="240" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_JoinWaitlist_di" bpmnElement="Flow_JoinWaitlist">
+        <omgdi:waypoint x="1395" y="240" />
+        <omgdi:waypoint x="1520" y="240" />
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="1416" y="218" width="89" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_CancelRegistration_di" bpmnElement="Flow_CancelRegistration">
+        <omgdi:waypoint x="1370" y="215" />
+        <omgdi:waypoint x="1370" y="100" />
+        <omgdi:waypoint x="1482" y="100" />
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="1375" y="150" width="61" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_6_di" bpmnElement="Flow_6">
+        <omgdi:waypoint x="1440" y="360" />
+        <omgdi:waypoint x="1480" y="360" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_7_di" bpmnElement="Flow_7">
+        <omgdi:waypoint x="1620" y="360" />
+        <omgdi:waypoint x="1680" y="360" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_8_di" bpmnElement="Flow_8">
+        <omgdi:waypoint x="1820" y="360" />
+        <omgdi:waypoint x="1882" y="360" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_WaitlistEnd_di" bpmnElement="Flow_WaitlistEnd">
+        <omgdi:waypoint x="1590" y="200" />
+        <omgdi:waypoint x="1590" y="180" />
+        <omgdi:waypoint x="1720" y="180" />
+        <omgdi:waypoint x="1720" y="222" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</definitions>
